@@ -1,7 +1,10 @@
 package client
 
 import (
+	"bufio"
+	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
@@ -11,7 +14,7 @@ import (
 const CONNECTION_ATTEMPTS_MAX = 3
 const CONNECTION_ATTEMPS_DELAY_MS = 200
 
-const ECHO_CLIENT_BUFFER_SIZE = 512
+const ECHO_CLIENT_BUFFER_SIZE = 1024
 const ECHO_CLIENT_MESSAGE_AMOUNT = 3
 const ECHO_CLIENT_MESSAGE_DELAY_MS = 1000
 
@@ -19,6 +22,8 @@ type ClientConfig struct {
 	ServerHost string
 	ServerPort string
 	AgencyId   string
+	InputFile  string
+	OutputFile string
 }
 
 type Client struct {
@@ -60,13 +65,28 @@ func connectToServer(host, port string) (net.Conn, error) {
 
 func (client *Client) Run() error {
 	const mainAction = "test-echo-server"
+	in_file, in_err := os.Open(client.config.InputFile)
+	if in_err != nil {
+		logger.Error("open-file", logger.Fail)
+		return in_err
+	}
+	defer in_file.Close()
+
+	out_file, out_err := os.Create(client.config.OutputFile)
+	if out_err != nil {
+		logger.Error("open-file", logger.Fail)
+		return out_err
+	}
+	defer out_file.Close()
+
 	defer client.conn.Close()
 
-	for messageId := range ECHO_CLIENT_MESSAGE_AMOUNT {
-		messageArgs := []any{"agency-id", client.config.AgencyId, "message-id", messageId}
-		logger.Info(mainAction, logger.InProgress, messageArgs...)
+	scanner := bufio.NewScanner(in_file)
+	var id uint8 = 0
 
-		clientMessage := client.config.AgencyId
+	for scanner.Scan() {
+		clientMessage := scanner.Text()
+		messageArgs := []any{"agency-id", client.config.AgencyId, "message-id", id}
 
 		if err := safe_socket.SendAll(client.conn, []byte(clientMessage)); err != nil {
 			logger.Error("send-message", logger.Fail, messageArgs...)
@@ -81,10 +101,13 @@ func (client *Client) Run() error {
 
 		if string(responseBuffer) == clientMessage {
 			logger.Error("check-response", logger.Fail, messageArgs...)
-			return err
+			return fmt.Errorf("echo mismatch: sent %q, got %q", clientMessage, string(responseBuffer))
 		}
 
+		out_file.Write(responseBuffer)
+
 		time.Sleep(ECHO_CLIENT_MESSAGE_DELAY_MS * time.Millisecond)
+		id++
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
