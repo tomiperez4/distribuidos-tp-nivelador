@@ -24,13 +24,13 @@ func loadConfig() (client.ClientConfig, error) {
 		return client.ClientConfig{}, errors.New("SERVER_PORT environment variable is required")
 	}
 
-	inputFile := os.Getenv("INPUT_FILE")
-	if inputFile == "" {
+	inputPath := os.Getenv("INPUT_FILE")
+	if inputPath == "" {
 		return client.ClientConfig{}, errors.New("INPUT_FILE environment variable is required")
 	}
 
-	outputFile := os.Getenv("OUTPUT_FILE")
-	if outputFile == "" {
+	outputPath := os.Getenv("OUTPUT_FILE")
+	if outputPath == "" {
 		return client.ClientConfig{}, errors.New("OUTPUT_FILE environment variable is required")
 	}
 
@@ -38,8 +38,8 @@ func loadConfig() (client.ClientConfig, error) {
 		ServerHost: serverHost,
 		ServerPort: serverPort,
 		AgencyId:   agencyId,
-		InputFile:  inputFile,
-		OutputFile: outputFile,
+		InputPath:  inputPath,
+		OutputPath: outputPath,
 	}, nil
 }
 

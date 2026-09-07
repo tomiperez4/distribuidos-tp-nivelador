@@ -2,31 +2,28 @@ package client
 
 import (
 	"bufio"
-	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
-	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
+	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/protocol"
 )
 
 const CONNECTION_ATTEMPTS_MAX = 3
 const CONNECTION_ATTEMPS_DELAY_MS = 200
 
-const ECHO_CLIENT_BUFFER_SIZE = 512
-const ECHO_CLIENT_MESSAGE_DELAY_MS = 1000
-
 type ClientConfig struct {
 	ServerHost string
 	ServerPort string
 	AgencyId   string
-	InputFile  string
-	OutputFile string
+	InputPath  string
+	OutputPath string
 }
 
 type Client struct {
-	conn   net.Conn
+	conn   protocol.Protocol
 	config ClientConfig
 }
 
@@ -37,7 +34,9 @@ func NewClient(config ClientConfig) (*Client, error) {
 		return nil, err
 	}
 
-	client := &Client{conn: conn, config: config}
+	betProtocol := protocol.NewProtocol(conn)
+
+	client := &Client{conn: betProtocol, config: config}
 	return client, nil
 }
 
@@ -64,49 +63,53 @@ func connectToServer(host, port string) (net.Conn, error) {
 
 func (client *Client) Run() error {
 	const mainAction = "test-echo-server"
-	in_file, in_err := os.Open(client.config.InputFile)
-	if in_err != nil {
+	inFile, inErr := os.Open(client.config.InputPath)
+	if inErr != nil {
 		logger.Error("open-file", logger.Fail)
-		return in_err
+		return inErr
 	}
-	defer in_file.Close()
+	defer inFile.Close()
 
-	out_file, out_err := os.Create(client.config.OutputFile)
-	if out_err != nil {
+	outFile, outErr := os.Create(client.config.OutputPath)
+	if outErr != nil {
 		logger.Error("open-file", logger.Fail)
-		return out_err
+		return outErr
 	}
-	defer out_file.Close()
+	defer outFile.Close()
 
 	defer client.conn.Close()
 
-	scanner := bufio.NewScanner(in_file)
+	scanner := bufio.NewScanner(inFile)
 	var id uint8 = 0
+	agencyId, _ := strconv.ParseUint(client.config.AgencyId, 10, 8)
 
 	for scanner.Scan() {
 		clientMessage := scanner.Text()
 		messageArgs := []any{"agency-id", client.config.AgencyId, "message-id", id}
 
-		if err := safe_socket.SendAll(client.conn, []byte(clientMessage)); err != nil {
+		bet, _ := FromCsv(clientMessage, uint8(agencyId))
+
+		if err := client.conn.SendBet(bet); err != nil {
 			logger.Error("send-message", logger.Fail, messageArgs...)
 			return err
 		}
+	}
 
-		responseBuffer, err := safe_socket.RecvAll(client.conn, ECHO_CLIENT_BUFFER_SIZE)
+	if err := client.conn.SendFin(); err != nil {
+		logger.Error("send-fin", logger.Fail)
+		return err
+	}
+
+	for {
+		bet, err := client.conn.RecvBet()
 		if err != nil {
-			logger.Error("recv-response", logger.Fail, messageArgs...)
+			if err == protocol.ErrEndOfWinners {
+				break
+			}
+			logger.Error("recv-bet", logger.Fail)
 			return err
 		}
-
-		if string(responseBuffer) == clientMessage {
-			logger.Error("check-response", logger.Fail, messageArgs...)
-			return fmt.Errorf("echo mismatch: sent %q, got %q", clientMessage, string(responseBuffer))
-		}
-
-		out_file.Write(responseBuffer)
-
-		time.Sleep(ECHO_CLIENT_MESSAGE_DELAY_MS * time.Millisecond)
-		id++
+		outFile.Write([]byte(ToCsv(bet)))
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 

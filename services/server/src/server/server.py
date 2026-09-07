@@ -1,39 +1,38 @@
 import socket
 import logger
-import safe_socket
-
-_ECHO_SERVER_MESSAGE_SIZE = 1014
+from protocol import Protocol, EndOfBets
+from lottery import Lottery
 
 
 class Server:
-    def __init__(self, server_host: str, server_port: int) -> None:
+    def __init__(self, server_host: str, server_port: int, storage_path: str) -> None:
         self.server_host = server_host
         self.server_port = server_port
+        self.lottery = Lottery(storage_path)
 
-    def _handle_client(self, client_socket):
+    def _handle_client(self, protocol: Protocol) -> None:
         action = "handle-client"
-        message_amount = 0
-        try:
-            logger.info(action, logger.LogResult.in_progress)
-            while True:
-                client_message = safe_socket.recv_all(
-                    client_socket, _ECHO_SERVER_MESSAGE_SIZE
+        while True:
+            try:
+                bet = protocol.recv_bet()
+                self.lottery.store_bets([bet])
+
+
+            except EndOfBets:
+                break
+            except Exception as e:
+                logger.error(
+                    action, logger.LogResult.fail
                 )
-                if not client_message:
-                    logger.info(
-                        action,
-                        logger.LogResult.success,
-                        "messages-amount",
-                        message_amount,
-                    )
-                    return
-                message_amount += 1
-                safe_socket.send_all(client_socket, client_message)
-        except Exception as e:
-            logger.error(
-                action, logger.LogResult.fail, "messages-amount", message_amount
-            )
-            raise e
+                raise e
+
+        bets = self.lottery.load_bets()
+
+        for bet in bets:
+            if self.lottery.has_won(bet):
+                protocol.send_bet(bet)
+
+        protocol.send_fin()
 
     def run(self):
         action = "accept-connection"
@@ -48,5 +47,6 @@ class Server:
                     logger.error(action, logger.LogResult.fail)
                     raise e
                 logger.info(action, logger.LogResult.success)
+                protocol = Protocol(client_socket)
 
-                self._handle_client(client_socket)
+                self._handle_client(protocol)

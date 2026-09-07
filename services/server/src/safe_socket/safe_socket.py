@@ -1,8 +1,5 @@
 import socket
 
-# TODO: Complete with a short-read/short-write tolerant implementation
-
-
 def recv_all(socket: socket.socket, size):
     total = 0
     data_buffer = b''
@@ -10,6 +7,8 @@ def recv_all(socket: socket.socket, size):
     while total < size:
         data = socket.recv(size - total)
         if not data:
+            if not data_buffer:
+                return b""
             raise ConnectionError
         data_buffer += data
         total += len(data)
