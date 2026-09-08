@@ -40,6 +40,8 @@ func FromBytes(opCode OpCode, payload []byte) (Packet, error) {
 		return betFromBytes(payload)
 	case FIN_OPCODE:
 		return finFromBytes(payload)
+	case ACK_OPCODE:
+		return ackFromBytes(payload)
 	default:
 		return nil, errors.New("invalid packet opcode")
 	}

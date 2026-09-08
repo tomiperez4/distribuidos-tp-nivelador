@@ -1,6 +1,6 @@
 import socket
 
-from packet import FinPacket, BetPacket, Packet, HEADER_LENGTH, parse_header, from_bytes
+from .packet import FinPacket, BetPacket, Packet, HEADER_LENGTH, parse_header, from_bytes
 from lottery import Bet
 from safe_socket import safe_socket
 
@@ -12,16 +12,16 @@ class Protocol:
         self.socket = client_socket
 
     def send_bet(self, bet: Bet) -> None:
-        self.__send_pkt__(BetPacket(bet))
+        self.__send_pkt__(BetPacket([bet], bet.agency_id))
 
     def send_fin(self) -> None:
         self.__send_pkt__(FinPacket())
 
-    def recv_bet(self) -> Bet:
+    def recv_batch(self) -> list[Bet]:
         packet = self.__recv_pkt__()
 
         if isinstance(packet, BetPacket):
-            return packet.bet
+            return packet.bets
         elif isinstance(packet, FinPacket):
             raise EndOfBets
         else:

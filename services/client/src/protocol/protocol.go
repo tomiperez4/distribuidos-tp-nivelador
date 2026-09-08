@@ -2,10 +2,11 @@ package protocol
 
 import (
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/lottery"
-	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/packet"
+	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/protocol/packet"
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
@@ -20,8 +21,8 @@ func NewProtocol(conn net.Conn) Protocol {
 	return Protocol{conn: conn}
 }
 
-func (p *Protocol) SendBet(bet lottery.Bet) error {
-	betPacket := packet.NewBetPacket(bet)
+func (p *Protocol) SendBets(bets []lottery.Bet, agencyId uint8) error {
+	betPacket := packet.NewBetPacket(bets, agencyId)
 	return p.sendPkt(betPacket)
 }
 
@@ -33,7 +34,10 @@ func (p *Protocol) RecvBet() (lottery.Bet, error) {
 
 	switch v := pkt.(type) {
 	case *packet.BetPacket:
-		return v.Bet(), nil
+		if len(v.Bets) != 1 {
+			return lottery.Bet{}, fmt.Errorf("Expected 1 bet only, but got %d", len(v.Bets))
+		}
+		return v.Bets[0], nil
 	case *packet.FinPacket:
 		return lottery.Bet{}, ErrEndOfWinners
 	default:
@@ -63,10 +67,12 @@ func (p *Protocol) recvPkt() (packet.Packet, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	payload, err := safe_socket.RecvAll(p.conn, int(payloadLen))
 	if err != nil {
 		return nil, err
 	}
+
 	return packet.FromBytes(opCode, payload)
 }
 

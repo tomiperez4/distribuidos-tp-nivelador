@@ -14,9 +14,8 @@ class Server:
         action = "handle-client"
         while True:
             try:
-                bet = protocol.recv_bet()
-                self.lottery.store_bets([bet])
-
+                bets = protocol.recv_batch()
+                self.lottery.store_bets(bets)
 
             except EndOfBets:
                 break
@@ -33,6 +32,7 @@ class Server:
                 protocol.send_bet(bet)
 
         protocol.send_fin()
+        protocol.close()
 
     def run(self):
         action = "accept-connection"

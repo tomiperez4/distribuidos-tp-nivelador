@@ -8,7 +8,7 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/lottery"
 )
 
-func FromCsv(csvBetLine string, agencyId uint8) (lottery.Bet, error) {
+func FromCsv(csvBetLine string) (lottery.Bet, error) {
 	args := strings.Split(csvBetLine, ",")
 	firstName, lastName := args[0], args[1]
 	document, err := strconv.ParseUint(args[2], 10, 32)
@@ -25,7 +25,6 @@ func FromCsv(csvBetLine string, agencyId uint8) (lottery.Bet, error) {
 	}
 
 	return lottery.Bet{
-		AgencyId:  agencyId,
 		FirstName: firstName,
 		LastName:  lastName,
 		Document:  uint32(document),

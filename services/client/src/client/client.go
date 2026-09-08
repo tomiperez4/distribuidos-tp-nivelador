@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"net"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
+	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/lottery"
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/protocol"
 )
 
@@ -17,9 +17,10 @@ const CONNECTION_ATTEMPS_DELAY_MS = 200
 type ClientConfig struct {
 	ServerHost string
 	ServerPort string
-	AgencyId   string
+	AgencyId   uint8
 	InputPath  string
 	OutputPath string
+	BatchSize  int
 }
 
 type Client struct {
@@ -63,6 +64,7 @@ func connectToServer(host, port string) (net.Conn, error) {
 
 func (client *Client) Run() error {
 	const mainAction = "test-echo-server"
+
 	inFile, inErr := os.Open(client.config.InputPath)
 	if inErr != nil {
 		logger.Error("open-file", logger.Fail)
@@ -80,17 +82,19 @@ func (client *Client) Run() error {
 	defer client.conn.Close()
 
 	scanner := bufio.NewScanner(inFile)
-	var id uint8 = 0
-	agencyId, _ := strconv.ParseUint(client.config.AgencyId, 10, 8)
 
-	for scanner.Scan() {
-		clientMessage := scanner.Text()
-		messageArgs := []any{"agency-id", client.config.AgencyId, "message-id", id}
+	for {
+		bets, err := readBatch(scanner, client.config.BatchSize)
+		if err != nil {
+			return err
+		}
 
-		bet, _ := FromCsv(clientMessage, uint8(agencyId))
+		if len(bets) == 0 {
+			break
+		}
 
-		if err := client.conn.SendBet(bet); err != nil {
-			logger.Error("send-message", logger.Fail, messageArgs...)
+		if err := client.conn.SendBets(bets, client.config.AgencyId); err != nil {
+			logger.Error("send-message", logger.Fail)
 			return err
 		}
 	}
@@ -114,4 +118,19 @@ func (client *Client) Run() error {
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
 	return nil
+}
+
+func readBatch(scanner *bufio.Scanner, size int) ([]lottery.Bet, error) {
+	const mainAction = "read-batch"
+	bets := make([]lottery.Bet, 0, size)
+
+	for scanner.Scan() && len(bets) < size {
+		bet, err := FromCsv(scanner.Text())
+		if err != nil {
+			return nil, err
+		}
+		bets = append(bets, bet)
+	}
+
+	return bets, nil
 }

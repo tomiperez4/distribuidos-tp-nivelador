@@ -1,0 +1,26 @@
+# Logs
+*.log
+logs/
+
+# JetBrains IDEs (PyCharm, GoLand, etc.)
+.idea/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Go
+*.exe
+*.test

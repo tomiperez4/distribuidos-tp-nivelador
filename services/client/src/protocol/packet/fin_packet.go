@@ -10,7 +10,7 @@ func NewFinPacket() Packet {
 
 func finFromBytes(payload []byte) (Packet, error) {
 	if len(payload) > 0 {
-		return nil, errors.New("unexpected payload. Should be len == 0")
+		return nil, errors.New("unexpected payload in fin packet. Should be len == 0")
 	}
 	return NewFinPacket(), nil
 }

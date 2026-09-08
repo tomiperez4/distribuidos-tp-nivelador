@@ -1,5 +1,5 @@
-from packet import Opcode
-from packet.packet import Packet, build_frame
+from .opcode import Opcode
+from .packet import Packet, build_frame
 
 
 class FinPacket(Packet):

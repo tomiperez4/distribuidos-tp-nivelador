@@ -1,34 +1,33 @@
 from lottery import Bet
 
-BET_HEADER_SIZE = 15
+BET_HEADER_SIZE = 14
 DATE_BYTE_SIZE = 4
 MAX_BYTE_SIZE = 255
 
-def decode_bet(payload: bytes) -> Bet:
+def decode_bet(payload: bytes, agency_id: int) -> tuple[Bet, int]:
     if len(payload) < BET_HEADER_SIZE:
         raise Exception("decode bet: header too short")
 
-    firstname_len = payload[13]
-    lastname_len = payload[14]
+    firstname_len = payload[12]
+    lastname_len = payload[13]
 
     total_len = BET_HEADER_SIZE + firstname_len + lastname_len
 
     if len(payload) < total_len:
         raise Exception("decode bet: payload too short")
 
-    agency_id = int.from_bytes(payload[0:1], byteorder='big')
-    document = int.from_bytes(payload[1:5], byteorder='big')
-    birthdate_int = int.from_bytes(payload[5:9], byteorder='big')
+    document = int.from_bytes(payload[:4], byteorder='big')
+    birthdate_int = int.from_bytes(payload[4:8], byteorder='big')
     birthdate = __unpack_date__(birthdate_int)
-    number = int.from_bytes(payload[9:13], byteorder='big')
+    number = int.from_bytes(payload[8:12], byteorder='big')
 
 
-    offset = 15
+    offset = 14
     firstname = payload[offset:offset + firstname_len].decode('utf-8')
     offset += firstname_len
     lastname = payload[offset:offset + lastname_len].decode('utf-8')
 
-    return Bet(agency_id, firstname, lastname, document, birthdate, number)
+    return Bet(agency_id, firstname, lastname, document, birthdate, number), total_len
 
 def encode_bet(bet: Bet) -> bytes:
     firstname = bet.first_name.encode('utf-8')
@@ -40,14 +39,12 @@ def encode_bet(bet: Bet) -> bytes:
     firstname_len = len(firstname).to_bytes(1, byteorder='big')
     lastname_len = len(lastname).to_bytes(1, byteorder='big')
 
-    agency_id = bet.agency_id.to_bytes(1, byteorder='big')
     document = bet.document.to_bytes(4, byteorder='big')
     birthdate = __pack_date__(bet.birthdate)
     number = bet.number.to_bytes(4, byteorder='big')
 
 
     return b"".join([
-        agency_id,
         document,
         birthdate,
         number,
