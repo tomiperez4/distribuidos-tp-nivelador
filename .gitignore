@@ -2,6 +2,9 @@
 *.log
 logs/
 
+# Storage
+storage/
+
 # JetBrains IDEs (PyCharm, GoLand, etc.)
 .idea/
 
