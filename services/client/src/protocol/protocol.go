@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/lottery"
@@ -14,8 +13,6 @@ type Protocol struct {
 	conn net.Conn
 }
 
-var ErrEndOfWinners = errors.New("all winners have been received")
-
 func NewProtocol(conn net.Conn) Protocol {
 
 	return Protocol{conn: conn}
@@ -26,22 +23,36 @@ func (p *Protocol) SendBets(bets []lottery.Bet, agencyId uint8) error {
 	return p.sendPkt(betPacket)
 }
 
-func (p *Protocol) RecvBet() (lottery.Bet, error) {
+func (p *Protocol) RecvAck() error {
 	pkt, err := p.recvPkt()
 	if err != nil {
-		return lottery.Bet{}, err
+		return err
 	}
 
-	switch v := pkt.(type) {
-	case *packet.BetPacket:
-		if len(v.Bets) != 1 {
-			return lottery.Bet{}, fmt.Errorf("Expected 1 bet only, but got %d", len(v.Bets))
+	if _, ok := pkt.(*packet.AckPacket); !ok {
+		return errors.New("expected ack packet")
+	}
+
+	return nil
+}
+
+func (p *Protocol) RecvWinners() ([]lottery.Bet, error) {
+	winners := make([]lottery.Bet, 0)
+
+	for {
+		pkt, err := p.recvPkt()
+		if err != nil {
+			return nil, err
 		}
-		return v.Bets[0], nil
-	case *packet.FinPacket:
-		return lottery.Bet{}, ErrEndOfWinners
-	default:
-		return lottery.Bet{}, errors.New("unkwnown packet type")
+
+		switch v := pkt.(type) {
+		case *packet.BetPacket:
+			winners = append(winners, v.Bets...)
+		case *packet.FinPacket:
+			return winners, nil
+		default:
+			return nil, errors.New("unkwnown packet type")
+		}
 	}
 }
 

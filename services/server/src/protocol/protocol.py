@@ -1,6 +1,6 @@
 import socket
 
-from .packet import FinPacket, BetPacket, Packet, HEADER_LENGTH, parse_header, from_bytes
+from .packet import AckPacket, FinPacket, BetPacket, Packet, HEADER_LENGTH, parse_header, from_bytes
 from lottery import Bet
 from safe_socket import safe_socket
 
@@ -16,6 +16,15 @@ class Protocol:
 
     def send_fin(self) -> None:
         self.__send_pkt__(FinPacket())
+
+    def send_ack(self) -> None:
+        self.__send_pkt__(AckPacket())
+
+    def send_winners(self, bets: list[Bet]) -> None:
+        agency_id = bets[0].agency_id if len(bets) > 0 else None
+        if agency_id is None:
+            return
+        self.__send_pkt__(BetPacket(bets, agency_id))
 
     def recv_batch(self) -> list[Bet]:
         packet = self.__recv_pkt__()

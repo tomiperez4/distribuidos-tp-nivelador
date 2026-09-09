@@ -97,6 +97,11 @@ func (client *Client) Run() error {
 			logger.Error("send-message", logger.Fail)
 			return err
 		}
+
+		if err := client.conn.RecvAck(); err != nil {
+			logger.Error("recv-ack", logger.Fail)
+			return err
+		}
 	}
 
 	if err := client.conn.SendFin(); err != nil {
@@ -104,16 +109,17 @@ func (client *Client) Run() error {
 		return err
 	}
 
-	for {
-		bet, err := client.conn.RecvBet()
-		if err != nil {
-			if err == protocol.ErrEndOfWinners {
-				break
-			}
-			logger.Error("recv-bet", logger.Fail)
+	winners, err := client.conn.RecvWinners()
+	if err != nil {
+		logger.Error("recv-winners", logger.Fail)
+		return err
+	}
+
+	for _, bet := range winners {
+		if _, err := outFile.Write([]byte(ToCsv(bet))); err != nil {
+			logger.Error("write-winner", logger.Fail)
 			return err
 		}
-		outFile.Write([]byte(ToCsv(bet)))
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
@@ -124,7 +130,7 @@ func readBatch(scanner *bufio.Scanner, size int) ([]lottery.Bet, error) {
 	const mainAction = "read-batch"
 	bets := make([]lottery.Bet, 0, size)
 
-	for scanner.Scan() && len(bets) < size {
+	for len(bets) < size && scanner.Scan() {
 		bet, err := FromCsv(scanner.Text())
 		if err != nil {
 			return nil, err
