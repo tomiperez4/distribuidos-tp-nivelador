@@ -2,8 +2,13 @@ package client
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"net"
 	"os"
+	"os/signal"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
@@ -24,8 +29,9 @@ type ClientConfig struct {
 }
 
 type Client struct {
-	conn   protocol.Protocol
-	config ClientConfig
+	conn         protocol.Protocol
+	config       ClientConfig
+	shuttingDown atomic.Bool
 }
 
 func NewClient(config ClientConfig) (*Client, error) {
@@ -81,6 +87,15 @@ func (client *Client) Run() error {
 
 	defer client.conn.Close()
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		<-ctx.Done()
+		client.shuttingDown.Store(true)
+		client.conn.Close()
+	}()
+
 	scanner := bufio.NewScanner(inFile)
 
 	for {
@@ -94,25 +109,21 @@ func (client *Client) Run() error {
 		}
 
 		if err := client.conn.SendBets(bets, client.config.AgencyId); err != nil {
-			logger.Error("send-message", logger.Fail)
-			return err
+			return client.handleConnErr("send-message", err)
 		}
 
 		if err := client.conn.RecvAck(); err != nil {
-			logger.Error("recv-ack", logger.Fail)
-			return err
+			return client.handleConnErr("recv-ack", err)
 		}
 	}
 
 	if err := client.conn.SendFin(); err != nil {
-		logger.Error("send-fin", logger.Fail)
-		return err
+		return client.handleConnErr("send-fin", err)
 	}
 
 	winners, err := client.conn.RecvWinners()
 	if err != nil {
-		logger.Error("recv-winners", logger.Fail)
-		return err
+		return client.handleConnErr("recv-winners", err)
 	}
 
 	for _, bet := range winners {
@@ -124,6 +135,15 @@ func (client *Client) Run() error {
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
 	return nil
+}
+
+func (client *Client) handleConnErr(action string, err error) error {
+	if client.shuttingDown.Load() && errors.Is(err, net.ErrClosed) {
+		logger.Info(action, logger.InProgress, "reason", "shutting down")
+		return nil
+	}
+	logger.Error(action, logger.Fail)
+	return err
 }
 
 func readBatch(scanner *bufio.Scanner, size int) ([]lottery.Bet, error) {

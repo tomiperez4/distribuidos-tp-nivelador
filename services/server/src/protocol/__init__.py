@@ -1,1 +1,1 @@
-from .protocol import Protocol, EndOfBets
+from .protocol import Protocol, EndOfBets, ConnectionClosed
