@@ -1,16 +1,18 @@
 import socket
 
 def recv_all(socket: socket.socket, size):
-    data_buffer = b""
+    chunks = []
+    received = 0
 
-    while len(data_buffer) < size:
-        data = socket.recv(size - len(data_buffer))
+    while received < size:
+        data = socket.recv(size - received)
 
         if not data:
             return b""
-        data_buffer += data
+        chunks.append(data)
+        received += len(data)
 
-    return data_buffer
+    return b"".join(chunks)
 
 
 def send_all(socket: socket.socket, bytes):
