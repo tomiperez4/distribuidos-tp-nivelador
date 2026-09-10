@@ -16,6 +16,8 @@ def bet_pkt_from_bytes(data: bytes, agency_id: int) -> Packet:
     offset = 0
     bets = []
 
+    # Como pueden llegar mas de una bet por paquete, la deserializacion del paquete devuelve cuantos bytes leyo
+    # para avanzar el offset
     while offset < len(data):
         bet, consumed = decode_bet(data[offset:], agency_id)
         bets.append(bet)

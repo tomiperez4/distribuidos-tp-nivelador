@@ -22,6 +22,7 @@ class Server:
             self.server_socket.close()
 
     def _shutdown(self):
+        # Setea la barrera en un estado "roto". Hace que aquellos parados en 'barrier.wait()' caigan en un error que se maneja en ese momento
         self.barrier.abort()
 
         for worker in self.workers:
@@ -37,6 +38,7 @@ class Server:
                 client_socket, _ = self.server_socket.accept()
 
             except OSError:
+                # Error de socket. Si se cerro por SIGTERM salimos prolijo, sino devuelvo error
                 if self.shutting_down:
                     return
                 logger.error(action, logger.LogResult.fail)
@@ -47,8 +49,10 @@ class Server:
             handler = ClientHandler(Protocol(client_socket), self.lottery, self.barrier)
             worker = Process(target=handler.run)
             worker.start()
+            # Server principal cierra el socket del cliente, para no tener dos FD apuntando al mismo socket
             client_socket.close()
 
+            # Por cada nuevo proceso que se dispara, se hace revision de los procesos, para solo mantener los que estan vivos.
             self.workers.append(worker)
             self.workers = [w for w in self.workers if w.is_alive()]
 

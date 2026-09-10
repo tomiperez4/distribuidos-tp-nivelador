@@ -16,8 +16,8 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/protocol"
 )
 
-const CONNECTION_ATTEMPTS_MAX = 3
-const CONNECTION_ATTEMPS_DELAY_MS = 200
+const CONNECTION_ATTEMPTS_MAX = 15
+const CONNECTION_ATTEMPS_DELAY_MS = 300
 
 type ClientConfig struct {
 	ServerHost string
@@ -41,9 +41,10 @@ func NewClient(config ClientConfig) (*Client, error) {
 		return nil, err
 	}
 
-	betProtocol := protocol.NewProtocol(conn)
-
-	client := &Client{conn: betProtocol, config: config}
+	client := &Client{
+		conn:   protocol.NewProtocol(conn),
+		config: config,
+	}
 	return client, nil
 }
 
@@ -88,11 +89,14 @@ func (client *Client) Run() error {
 
 	defer client.conn.Close()
 
+	// En ctx se recibe la señal de SIGTERM
+	// stop es una funcion de cancelacion para volver al estado previo a llamar NotifyContext
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 	defer stop()
 
 	go func() {
 		<-ctx.Done()
+		// Seteamos en true la flag. Si da error Send_all/Recv_all, validamos con esto que sea por SIGTERM
 		client.shuttingDown.Store(true)
 		client.conn.Close()
 	}()
@@ -124,11 +128,7 @@ func (client *Client) communicationProcess(scanner *bufio.Scanner, outFile *os.F
 		}
 
 		if err := client.conn.SendBets(bets); err != nil {
-			return "send-message", err
-		}
-
-		if err := client.conn.RecvAck(); err != nil {
-			return "recv-ack", err
+			return "send-bets", err
 		}
 	}
 

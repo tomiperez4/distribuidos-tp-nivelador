@@ -22,7 +22,7 @@ func (p *Protocol) Handshake(agencyId uint8) error {
 		return err
 	}
 
-	if err := p.RecvAck(); err != nil {
+	if err := p.recvAck(); err != nil {
 		return err
 	}
 	return nil
@@ -33,10 +33,13 @@ func (p *Protocol) sendHello(agencyId uint8) error {
 }
 
 func (p *Protocol) SendBets(bets []lottery.Bet) error {
-	return p.sendPkt(packet.NewBetPacket(bets))
+	if err := p.sendPkt(packet.NewBetPacket(bets)); err != nil {
+		return err
+	}
+	return p.recvAck()
 }
 
-func (p *Protocol) RecvAck() error {
+func (p *Protocol) recvAck() error {
 	pkt, err := p.recvPkt()
 	if err != nil {
 		return err

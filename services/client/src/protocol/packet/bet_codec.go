@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	_BET_FIXED_FIELDS_SIZE = 14
-	_DATE_BYTE_SIZE        = 4
-	_DATE_FIELD_COUNT      = 3
+	_BET_FIXED_FIELDS_SIZE = 14 // Tamaño fijo (bytes) del tamaño de un Bet
+	_DATE_BYTE_SIZE        = 4  // Tamaño que ocupa una fecha en bytes
+	_DATE_FIELD_COUNT      = 3  // Cantidad de campos de fecha
 )
 
 func deserializeBet(data []byte) (lottery.Bet, int, error) {
@@ -45,6 +45,8 @@ func deserializeBet(data []byte) (lottery.Bet, int, error) {
 func serializeBet(bet lottery.Bet) ([]byte, error) {
 	firstName, lastName := []byte(bet.FirstName), []byte(bet.LastName)
 	if len(firstName) > math.MaxUint8 || len(lastName) > math.MaxUint8 {
+		// Validacion del largo de nombre y apellido (campos variables)
+		// Para que no excedan el largo de 1 byte
 		return nil, errors.New("encode bet: first or last name too long")
 	}
 

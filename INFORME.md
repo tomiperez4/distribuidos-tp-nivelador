@@ -68,7 +68,7 @@ sequenceDiagram
     C->>C: escribe ganadores en el archivo de salida
 ```
 
-El flujo es el siguiente: al conectarse, el cliente hace el *handshake* (`HELLO` + `ACK`) para identificarse ante el servidor con su `agency_id`. Luego entra en un loop enviando sus apuestas en _batches_, confirmando cada uno con un `ACK`. Una vez que se enviaron todos los _batches_, se envia un `FIN` indicando que ya terminó.
+El flujo es el siguiente: al conectarse, el cliente hace el *handshake* (`HELLO` + `ACK`) para identificarse ante el servidor con su `agency_id`. Luego entra en un loop enviando sus apuestas en _batches_ mediante `SendBets`, que internamente envía el _batch_ de apuestas al servidor y espera recibir un `ACK` del servidor, indicando la confirmación del servidor de la recepción del _batch_ y su correcto guardado en disco. Una vez que se enviaron todos los _batches_, se envía un `FIN` indicando que ya terminó.
 
 A partir de ahí el cliente queda esperando una respuesta, mientras que del lado del servidor el proceso que atiende a esa agencia llama a `barrier.wait()` y también queda bloqueado — ninguno de los dos hace nada más hasta que se libera la barrera, es decir, hasta que **todas** las agencias requeridas terminaron de mandar sus apuestas. Una vez liberada, cada proceso lee `storage.csv` completo, filtra los ganadores de su propia agencia y se los envía al cliente en un `BET` seguido de un `FIN`. El cliente al recibir los ganadores, los vuelva a disco, a su archivo de salida correspondiente.
 

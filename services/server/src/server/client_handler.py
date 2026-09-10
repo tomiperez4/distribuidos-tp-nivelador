@@ -21,11 +21,10 @@ class ClientHandler:
         logger.init()
         signal.signal(signal.SIGTERM, self._request_shutdown)
 
-        
-        if not self._receive_hello():
+        if not self._recv_hello():
             return
 
-        if not self._receive_bets():
+        if not self._recv_bets():
             return
 
         try:
@@ -34,24 +33,13 @@ class ClientHandler:
             self.protocol.close()
             return
 
-        winners = [
-            bet for bet in self._load_bets_locked()
-            if self.lottery.has_won(bet) and bet.agency_id == self.protocol.agency_id
-        ]
-
-        self.protocol.send_winners(winners)
-        self.protocol.send_fin()
-        self.protocol.close()
-
-        logger.info(
-            "handle-client", logger.LogResult.success, "agency-id", self.protocol.agency_id
-        )
+        self._send_winners()
 
     def _request_shutdown(self, signum, frame) -> None:
         self.shutting_down = True
         self.protocol.close()
 
-    def _receive_hello(self) -> bool:
+    def _recv_hello(self) -> bool:
         action = "handle-client-hello"
 
         try:
@@ -64,6 +52,7 @@ class ClientHandler:
             self.protocol.close()
             return False
         except OSError:
+            # Error de socket. Si se cerro por SIGTERM salimos prolijo, sino devuelvo error
             if self.shutting_down:
                 return False
             logger.error(action, logger.LogResult.fail)
@@ -72,7 +61,7 @@ class ClientHandler:
             logger.error(action, logger.LogResult.fail)
             raise e
 
-    def _receive_bets(self) -> bool:
+    def _recv_bets(self) -> bool:
         action = "handle-client-bets"
 
         while True:
@@ -90,6 +79,7 @@ class ClientHandler:
                 self.protocol.close()
                 return False
             except OSError:
+                # Error de socket. Si se cerro por SIGTERM salimos prolijo, sino devuelvo error
                 if self.shutting_down:
                     return False
                 logger.error(action, logger.LogResult.fail)
@@ -98,10 +88,26 @@ class ClientHandler:
                 logger.error(action, logger.LogResult.fail)
                 raise e
 
+    def _send_winners(self):
+        winners = [
+            bet for bet in self._load_bets_locked()
+            if self.lottery.has_won(bet) and bet.agency_id == self.protocol.agency_id
+        ]
+
+        self.protocol.send_winners(winners)
+        self.protocol.send_fin()
+        self.protocol.close()
+
+        logger.info(
+            "handle-client", logger.LogResult.success, "agency-id", self.protocol.agency_id
+        )
+
     def _store_bets_locked(self, bets: list[Bet]) -> None:
+        # Tomo lock EXCLUSIVO para escribir en el archivo de almacenamiento del servidor
         with _file_lock(self.lottery.storage_path, fcntl.LOCK_EX):
             self.lottery.store_bets(bets)
 
     def _load_bets_locked(self) -> Iterator[Bet]:
+        # Tomo lock COMPARTIDO para iterar el archivo. Pueden haber varios lectores, pero NINGUN escritor
         with _file_lock(self.lottery.storage_path, fcntl.LOCK_SH):
             yield from self.lottery.load_bets()

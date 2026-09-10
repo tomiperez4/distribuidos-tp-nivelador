@@ -11,7 +11,7 @@ const (
 )
 
 type Packet interface {
-	// ToBytes transform the packet into a slice of bytes. Returns also an error type, in case it occurs
+	// ToBytes convierte al paquete en un arreglo de bytes. Devuelve error si lo hubo
 	ToBytes() ([]byte, error)
 }
 
