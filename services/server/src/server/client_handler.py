@@ -21,6 +21,7 @@ class ClientHandler:
         logger.init()
         signal.signal(signal.SIGTERM, self._request_shutdown)
 
+        
         if not self._receive_hello():
             return
 
@@ -67,6 +68,9 @@ class ClientHandler:
                 return False
             logger.error(action, logger.LogResult.fail)
             raise
+        except Exception as e:
+            logger.error(action, logger.LogResult.fail)
+            raise e
 
     def _receive_bets(self) -> bool:
         action = "handle-client-bets"

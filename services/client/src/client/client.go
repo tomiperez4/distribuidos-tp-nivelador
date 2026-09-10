@@ -104,10 +104,19 @@ func (client *Client) Run() error {
 
 	scanner := bufio.NewScanner(inFile)
 
+	if action, err := client.communicationProcess(scanner, outFile); err != nil {
+		return client.handleConnErr(action, err)
+	}
+	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
+
+	return nil
+}
+
+func (client *Client) communicationProcess(scanner *bufio.Scanner, outFile *os.File) (string, error) {
 	for {
 		bets, err := readBatch(scanner, client.config.BatchSize)
 		if err != nil {
-			return err
+			return "read-batch", err
 		}
 
 		if len(bets) == 0 {
@@ -115,37 +124,34 @@ func (client *Client) Run() error {
 		}
 
 		if err := client.conn.SendBets(bets); err != nil {
-			return client.handleConnErr("send-message", err)
+			return "send-message", err
 		}
 
 		if err := client.conn.RecvAck(); err != nil {
-			return client.handleConnErr("recv-ack", err)
+			return "recv-ack", err
 		}
 	}
 
 	if err := client.conn.SendFin(); err != nil {
-		return client.handleConnErr("send-fin", err)
+		return "send-fin", err
 	}
 
 	winners, err := client.conn.RecvWinners()
 	if err != nil {
-		return client.handleConnErr("recv-winners", err)
+		return "recv-winners", err
 	}
 
 	for _, bet := range winners {
 		if _, err := outFile.Write([]byte(ToCsv(bet))); err != nil {
-			logger.Error("write-winner", logger.Fail)
-			return err
+			return "write-winner", err
 		}
 	}
 
 	if err := outFile.Sync(); err != nil {
-		logger.Error("write-winner", logger.Fail)
-		return err
+		return "sync-output-file", err
 	}
-	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
-	return nil
+	return "", nil
 }
 
 func (client *Client) handleConnErr(action string, err error) error {

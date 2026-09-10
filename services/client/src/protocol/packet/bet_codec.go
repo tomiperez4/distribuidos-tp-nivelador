@@ -14,6 +14,7 @@ import (
 const (
 	_BET_FIXED_FIELDS_SIZE = 14
 	_DATE_BYTE_SIZE        = 4
+	_DATE_FIELD_COUNT      = 3
 )
 
 func deserializeBet(data []byte) (lottery.Bet, int, error) {
@@ -47,10 +48,15 @@ func serializeBet(bet lottery.Bet) ([]byte, error) {
 		return nil, errors.New("encode bet: first or last name too long")
 	}
 
+	birthdate, err := packDate(bet.Birthdate)
+	if err != nil {
+		return nil, err
+	}
+
 	buff := make([]byte, 0, _BET_FIXED_FIELDS_SIZE+len(firstName)+len(lastName))
 
 	buff = binary.BigEndian.AppendUint32(buff, bet.Document)
-	buff = append(buff, packDate(bet.Birthdate)...)
+	buff = append(buff, birthdate...)
 	buff = binary.BigEndian.AppendUint32(buff, bet.Number)
 	buff = append(buff, uint8(len(firstName)))
 	buff = append(buff, uint8(len(lastName)))
@@ -60,13 +66,16 @@ func serializeBet(bet lottery.Bet) ([]byte, error) {
 	return buff, nil
 }
 
-func packDate(date string) []byte {
-	year, month, day := parseDate(date)
+func packDate(date string) ([]byte, error) {
+	year, month, day, err := parseDate(date)
+	if err != nil {
+		return nil, err
+	}
 	birthdate := year*10000 + month*100 + day
 
 	buff := make([]byte, 0, _DATE_BYTE_SIZE)
 
-	return binary.BigEndian.AppendUint32(buff, birthdate)
+	return binary.BigEndian.AppendUint32(buff, birthdate), nil
 }
 
 func unpackDate(data []byte) string {
@@ -75,15 +84,19 @@ func unpackDate(data []byte) string {
 	return fmt.Sprintf("%d-%02d-%02d", year, month, day)
 }
 
-func parseDate(date string) (uint32, uint32, uint32) {
+func parseDate(date string) (uint32, uint32, uint32, error) {
 	dateArr := strings.Split(date, "-")
+	if len(dateArr) != _DATE_FIELD_COUNT {
+		return 0, 0, 0, fmt.Errorf("decode bet: expected date as YYYY-MM-DD, got %q", date)
+	}
+
 	year, errY := strconv.ParseUint(dateArr[0], 10, 16)
 	month, errM := strconv.ParseUint(dateArr[1], 10, 8)
 	day, errD := strconv.ParseUint(dateArr[2], 10, 8)
 
 	if errY != nil || errM != nil || errD != nil {
-		return 0, 0, 0
+		return 0, 0, 0, fmt.Errorf("decode bet: invalid date %q", date)
 	}
 
-	return uint32(year), uint32(month), uint32(day)
+	return uint32(year), uint32(month), uint32(day), nil
 }
