@@ -53,6 +53,7 @@ func connectToServer(host, port string) (net.Conn, error) {
 	var conn net.Conn
 
 	logger.Info(action, logger.InProgress)
+
 	for i := range CONNECTION_ATTEMPTS_MAX {
 		conn, err = net.Dial("tcp", host+":"+port)
 		if err != nil {
@@ -69,7 +70,7 @@ func connectToServer(host, port string) (net.Conn, error) {
 }
 
 func (client *Client) Run() error {
-	const mainAction = "test-echo-server"
+	const mainAction = "client-running"
 
 	inFile, inErr := os.Open(client.config.InputPath)
 	if inErr != nil {
@@ -96,6 +97,11 @@ func (client *Client) Run() error {
 		client.conn.Close()
 	}()
 
+	if err := client.conn.Handshake(client.config.AgencyId); err != nil {
+		return client.handleConnErr("handshake", err)
+	}
+	logger.Info("handshake", logger.Success, "agency-id", client.config.AgencyId)
+
 	scanner := bufio.NewScanner(inFile)
 
 	for {
@@ -108,7 +114,7 @@ func (client *Client) Run() error {
 			break
 		}
 
-		if err := client.conn.SendBets(bets, client.config.AgencyId); err != nil {
+		if err := client.conn.SendBets(bets); err != nil {
 			return client.handleConnErr("send-message", err)
 		}
 
@@ -131,6 +137,11 @@ func (client *Client) Run() error {
 			logger.Error("write-winner", logger.Fail)
 			return err
 		}
+	}
+
+	if err := outFile.Sync(); err != nil {
+		logger.Error("write-winner", logger.Fail)
+		return err
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 

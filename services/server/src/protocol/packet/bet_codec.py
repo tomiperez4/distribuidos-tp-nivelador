@@ -1,17 +1,17 @@
 from lottery import Bet
 
-BET_HEADER_SIZE = 14
+BET_FIXED_FIELDS_SIZE = 14
 DATE_BYTE_SIZE = 4
 MAX_BYTE_SIZE = 255
 
 def decode_bet(payload: bytes, agency_id: int) -> tuple[Bet, int]:
-    if len(payload) < BET_HEADER_SIZE:
+    if len(payload) < BET_FIXED_FIELDS_SIZE:
         raise Exception("decode bet: header too short")
 
     firstname_len = payload[12]
     lastname_len = payload[13]
 
-    total_len = BET_HEADER_SIZE + firstname_len + lastname_len
+    total_len = BET_FIXED_FIELDS_SIZE + firstname_len + lastname_len
 
     if len(payload) < total_len:
         raise Exception("decode bet: payload too short")
@@ -22,7 +22,7 @@ def decode_bet(payload: bytes, agency_id: int) -> tuple[Bet, int]:
     number = int.from_bytes(payload[8:12], byteorder='big')
 
 
-    offset = 14
+    offset = BET_FIXED_FIELDS_SIZE
     firstname = payload[offset:offset + firstname_len].decode('utf-8')
     offset += firstname_len
     lastname = payload[offset:offset + lastname_len].decode('utf-8')

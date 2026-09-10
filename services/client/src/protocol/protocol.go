@@ -14,13 +14,26 @@ type Protocol struct {
 }
 
 func NewProtocol(conn net.Conn) Protocol {
-
 	return Protocol{conn: conn}
 }
 
-func (p *Protocol) SendBets(bets []lottery.Bet, agencyId uint8) error {
-	betPacket := packet.NewBetPacket(bets, agencyId)
-	return p.sendPkt(betPacket)
+func (p *Protocol) Handshake(agencyId uint8) error {
+	if err := p.sendHello(agencyId); err != nil {
+		return err
+	}
+
+	if err := p.RecvAck(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *Protocol) sendHello(agencyId uint8) error {
+	return p.sendPkt(packet.NewHelloPacket(agencyId))
+}
+
+func (p *Protocol) SendBets(bets []lottery.Bet) error {
+	return p.sendPkt(packet.NewBetPacket(bets))
 }
 
 func (p *Protocol) RecvAck() error {
@@ -69,22 +82,22 @@ func (p *Protocol) sendPkt(pkt packet.Packet) error {
 }
 
 func (p *Protocol) recvPkt() (packet.Packet, error) {
-	header, err := safe_socket.RecvAll(p.conn, packet.HEADER_LENGTH)
+	headerBytes, err := safe_socket.RecvAll(p.conn, packet.HEADER_LENGTH)
 	if err != nil {
 		return nil, err
 	}
 
-	opCode, payloadLen, err := packet.ParseHeader(header)
+	header, err := packet.ParseHeader(headerBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	payload, err := safe_socket.RecvAll(p.conn, int(payloadLen))
+	payload, err := safe_socket.RecvAll(p.conn, int(header.PayloadLen))
 	if err != nil {
 		return nil, err
 	}
 
-	return packet.FromBytes(opCode, payload)
+	return packet.FromBytes(header.OpCode, payload)
 }
 
 func (p *Protocol) Close() {

@@ -4,11 +4,7 @@ import logger
 from protocol import Protocol
 from lottery import Lottery
 from multiprocessing import Process, Barrier
-
 from .client_handler import ClientHandler
-
-WORKER_JOIN_TIMEOUT = 5
-
 
 class Server:
     def __init__(self, server_host: str, server_port: int, storage_path: str, agency_min_quorum: int) -> None:
@@ -27,9 +23,6 @@ class Server:
 
     def _shutdown(self):
         self.barrier.abort()
-
-        for worker in self.workers:
-            worker.join(WORKER_JOIN_TIMEOUT)
 
         for worker in self.workers:
             if worker.is_alive():

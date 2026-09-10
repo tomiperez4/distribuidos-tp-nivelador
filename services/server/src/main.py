@@ -1,18 +1,37 @@
 import os
 import sys
+from dataclasses import dataclass
 
 import logger
 import server
 
-SERVER_HOST = os.environ["SERVER_HOST"]
-SERVER_PORT = int(os.environ["SERVER_PORT"])
-STORAGE_PATH = os.environ.get("STORAGE_PATH", "storage.csv")
-AGENCY_QUORUM_MIN = int(os.environ["AGENCY_QUORUM_MIN"])
+
+@dataclass(frozen=True)
+class ServerConfig:
+    server_host: str
+    server_port: int
+    storage_path: str
+    agency_quorum_min: int
+
+
+def load_config() -> ServerConfig:
+    return ServerConfig(
+        server_host=os.environ["SERVER_HOST"],
+        server_port=int(os.environ["SERVER_PORT"]),
+        storage_path=os.environ.get("STORAGE_PATH", "storage.csv"),
+        agency_quorum_min=int(os.environ["AGENCY_QUORUM_MIN"]),
+    )
 
 
 def main():
     logger.init()
-    s = server.Server(SERVER_HOST, SERVER_PORT, STORAGE_PATH, AGENCY_QUORUM_MIN)
+    config = load_config()
+    s = server.Server(
+        config.server_host,
+        config.server_port,
+        config.storage_path,
+        config.agency_quorum_min,
+    )
     try:
         s.run()
     except Exception as e:

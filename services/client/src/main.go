@@ -17,7 +17,7 @@ func loadConfig() (client.ClientConfig, error) {
 	}
 	agencyId, err := strconv.ParseUint(rawAgencyId, 10, 8)
 	if err != nil {
-		return client.ClientConfig{}, fmt.Errorf("AGENCY_ID must be a valid number between 0 and 255: %w", err)
+		return client.ClientConfig{}, fmt.Errorf("AGENCY_ID must be a valid single-byte (0-255) number : %w", err)
 	}
 
 	serverHost := os.Getenv("SERVER_HOST")

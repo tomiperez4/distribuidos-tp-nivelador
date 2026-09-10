@@ -12,22 +12,22 @@ import (
 )
 
 const (
-	_BET_HEADER_SIZE = 14
-	_DATE_BYTE_SIZE  = 4
+	_BET_FIXED_FIELDS_SIZE = 14
+	_DATE_BYTE_SIZE        = 4
 )
 
 func deserializeBet(data []byte) (lottery.Bet, int, error) {
-	if len(data) < _BET_HEADER_SIZE {
+	if len(data) < _BET_FIXED_FIELDS_SIZE {
 		return lottery.Bet{}, 0, errors.New("decode bet: header too short")
 	}
 
 	lenFirst, lenLast := int(data[12]), int(data[13])
-	total := _BET_HEADER_SIZE + lenFirst + lenLast
+	total := _BET_FIXED_FIELDS_SIZE + lenFirst + lenLast
 	if len(data) < total {
 		return lottery.Bet{}, 0, errors.New("decode bet: short payload")
 	}
 
-	payloadLen := _BET_HEADER_SIZE
+	payloadLen := _BET_FIXED_FIELDS_SIZE
 	firstName := string(data[payloadLen : payloadLen+lenFirst])
 	payloadLen += lenFirst
 	lastName := string(data[payloadLen : payloadLen+lenLast])
@@ -47,7 +47,7 @@ func serializeBet(bet lottery.Bet) ([]byte, error) {
 		return nil, errors.New("encode bet: first or last name too long")
 	}
 
-	buff := make([]byte, 0, _BET_HEADER_SIZE+len(firstName)+len(lastName))
+	buff := make([]byte, 0, _BET_FIXED_FIELDS_SIZE+len(firstName)+len(lastName))
 
 	buff = binary.BigEndian.AppendUint32(buff, bet.Document)
 	buff = append(buff, packDate(bet.Birthdate)...)

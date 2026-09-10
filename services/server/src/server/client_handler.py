@@ -18,10 +18,13 @@ class ClientHandler:
         self.shutting_down = False
 
     def run(self) -> None:
+        logger.init()
         signal.signal(signal.SIGTERM, self._request_shutdown)
 
-        agency_id, completed = self._receive_bets()
-        if not completed:
+        if not self._receive_hello():
+            return
+
+        if not self._receive_bets():
             return
 
         try:
@@ -32,40 +35,59 @@ class ClientHandler:
 
         winners = [
             bet for bet in self._load_bets_locked()
-            if self.lottery.has_won(bet) and bet.agency_id == agency_id
+            if self.lottery.has_won(bet) and bet.agency_id == self.protocol.agency_id
         ]
 
         self.protocol.send_winners(winners)
         self.protocol.send_fin()
         self.protocol.close()
 
-    def _request_shutdown(self) -> None:
+        logger.info(
+            "handle-client", logger.LogResult.success, "agency-id", self.protocol.agency_id
+        )
+
+    def _request_shutdown(self, signum, frame) -> None:
         self.shutting_down = True
         self.protocol.close()
 
-    def _receive_bets(self) -> tuple[int | None, bool]:
-        action = "handle-client"
-        agency_id = None
+    def _receive_hello(self) -> bool:
+        action = "handle-client-hello"
+
+        try:
+            agency_id = self.protocol.recv_hello()
+            self.protocol.send_ack()
+            logger.info(action, logger.LogResult.success, "agency-id", agency_id)
+            return True
+        except ConnectionClosed:
+            logger.info(action, logger.LogResult.fail)
+            self.protocol.close()
+            return False
+        except OSError:
+            if self.shutting_down:
+                return False
+            logger.error(action, logger.LogResult.fail)
+            raise
+
+    def _receive_bets(self) -> bool:
+        action = "handle-client-bets"
 
         while True:
             try:
                 bets = self.protocol.recv_batch()
-                if bets:
-                    agency_id = bets[0].agency_id
 
                 self._store_bets_locked(bets)
 
                 self.protocol.send_ack()
 
             except EndOfBets:
-                return agency_id, True
+                return True
             except ConnectionClosed:
                 logger.info(action, logger.LogResult.fail)
                 self.protocol.close()
-                return agency_id, False
+                return False
             except OSError:
                 if self.shutting_down:
-                    return agency_id, False
+                    return False
                 logger.error(action, logger.LogResult.fail)
                 raise
             except Exception as e:

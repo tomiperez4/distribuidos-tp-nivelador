@@ -1,6 +1,6 @@
 import socket
 
-from .packet import AckPacket, FinPacket, BetPacket, Packet, HEADER_LENGTH, parse_header, from_bytes
+from .packet import AckPacket, FinPacket, BetPacket, HelloPacket, Packet, HEADER_LENGTH, parse_header, from_bytes
 from lottery import Bet
 from safe_socket import safe_socket
 
@@ -13,9 +13,14 @@ class ConnectionClosed(Exception):
 class Protocol:
     def __init__(self, client_socket: socket.socket):
         self.socket = client_socket
+        self.agency_id: int | None = None
 
-    def send_bet(self, bet: Bet) -> None:
-        self.__send_pkt__(BetPacket([bet], bet.agency_id))
+    def recv_hello(self) -> int:
+        packet = self.__recv_pkt__()
+        if not isinstance(packet, HelloPacket):
+            raise Exception("expected hello packet")
+        self.agency_id = packet.agency_id
+        return packet.agency_id
 
     def send_fin(self) -> None:
         self.__send_pkt__(FinPacket())
@@ -24,10 +29,9 @@ class Protocol:
         self.__send_pkt__(AckPacket())
 
     def send_winners(self, bets: list[Bet]) -> None:
-        agency_id = bets[0].agency_id if len(bets) > 0 else None
-        if agency_id is None:
+        if not bets:
             return
-        self.__send_pkt__(BetPacket(bets, agency_id))
+        self.__send_pkt__(BetPacket(bets))
 
     def recv_batch(self) -> list[Bet]:
         packet = self.__recv_pkt__()
@@ -41,6 +45,7 @@ class Protocol:
 
     def close(self) -> None:
         self.socket.close()
+
 
     def __send_pkt__(self, pkt: Packet) -> None:
         frame = pkt.to_bytes()
@@ -56,4 +61,4 @@ class Protocol:
         if not payload and header.length > 0:
             raise ConnectionClosed
 
-        return from_bytes(header.opcode, payload)
+        return from_bytes(header.opcode, payload, self.agency_id)

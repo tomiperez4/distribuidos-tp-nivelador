@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	HEADER_LENGTH = 5
+	HEADER_LENGTH  = 5
+	AGENCY_ID_SIZE = 1
 )
 
 type Packet interface {
@@ -24,14 +25,19 @@ func buildFrame(opCode OpCode, payload []byte) []byte {
 	return buff
 }
 
-func ParseHeader(buff []byte) (OpCode, uint32, error) {
+type Header struct {
+	OpCode     OpCode
+	PayloadLen uint32
+}
+
+func ParseHeader(buff []byte) (Header, error) {
 	if len(buff) < HEADER_LENGTH {
-		return 0, 0, errors.New("packet header too short")
+		return Header{}, errors.New("packet header too short")
 	}
 	opCode := OpCode(buff[0])
 	payloadLen := binary.BigEndian.Uint32(buff[1:HEADER_LENGTH])
 
-	return opCode, payloadLen, nil
+	return Header{OpCode: opCode, PayloadLen: payloadLen}, nil
 }
 
 func FromBytes(opCode OpCode, payload []byte) (Packet, error) {

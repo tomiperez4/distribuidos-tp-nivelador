@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
 HEADER_LENGTH = 5
+AGENCY_ID_SIZE = 1
+
 class Header:
     def __init__(self, opcode: int, length: int):
         self.opcode = opcode

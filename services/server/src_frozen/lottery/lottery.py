@@ -26,6 +26,7 @@ class Lottery:
                         bet.number,
                     ]
                 )
+            file.flush()
 
     def load_bets(self) -> Iterator[Bet]:
         with open(self.storage_path, "r") as file:
